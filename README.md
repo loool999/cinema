@@ -42,13 +42,8 @@ To start the proxy server, run the following command:
 node server.js
 ```
 
-The server will start, and you can see the listening address in the console:
+Then the server will start.
 
-```
-Listening on:
-    http://localhost:8080
-    http://127.0.0.1:8080
-```
 
 ## License
 
