@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloth Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+            overflow-x: hidden;
+        }
+
+        .container {
+            position: relative;
+            width: 100%;
+            height: 600px;
+            perspective: 1000px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .cloth {
+            position: relative;
+            transform-style: preserve-3d;
+        }
+
+        .cloth-point {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: white;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            will-change: transform;
+        }
+
+        .cloth-point.pinned {
+            background: rgba(255, 100, 100, 0.3);
+            border-color: rgba(255, 100, 100, 0.6);
+        }
+
+        .cloth-point.selected {
+            background: rgba(100, 255, 100, 0.5);
+            border-color: rgba(100, 255, 100, 0.8);
+        }
+
+        .cloth-point.corner {
+            width: 60px;
+            height: 60px;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .controls h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+
+        .control-group {
+            margin: 10px 0;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 12px;
+        }
+
+        .control-group input, .control-group select {
+            width: 150px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        .control-group button {
+            padding: 8px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 2px;
+        }
+
+        .control-group button:hover {
+            background: #5a6fd8;
+        }
+
+        .iframe-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 480px;
+            height: 320px;
+            pointer-events: none; /* Disabled by default */
+            opacity: 0.9;
+            overflow: hidden;
+            transform-origin: top left;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 10;
+            will-change: transform;
+        }
+
+        .iframe-overlay.interactive {
+            pointer-events: auto;
+        }
+        
+        .iframe-overlay:hover {
+            opacity: 1;
+            z-index: 15;
+        }
+        
+        .iframe-overlay.interactive {
+            pointer-events: auto;
+        }
+        
+        .iframe-overlay.cloth-mode {
+            pointer-events: none;
+        }
+
+        .iframe-overlay iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+
+        .iframe-fallback {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="controls">
+            <h3>Cloth Controls</h3>
+            
+            <div class="control-group">
+                <label>Content URL:</label>
+                <select id="contentSelect">
+                    <option value="https://www.example.com">Example.com</option>
+                    <option value="https://httpbin.org/html">HTTP Test Page</option>
+                    <option value="https://www.google.com/search?q=physics&igu=1">Google Search</option>
+                    <option value="custom">Custom URL</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="customUrlGroup" style="display:none;">
+                <label>Custom URL:</label>
+                <input type="url" id="iframeUrl" placeholder="https://example.com">
+            </div>
+            
+            <div class="control-group">
+                <button onclick="loadContent()">Load Content</button>
+                <button onclick="toggleIframe()">Toggle Content</button>
+                <button onclick="toggleInteraction()">Toggle Interaction</button>
+            </div>
+            
+            <div class="control-group">
+                <label>Interaction Mode:</label>
+                <select id="interactionMode">
+                    <option value="cloth">Cloth Mode (drag cloth)</option>
+                    <option value="iframe">Content Mode (interact with site)</option>
+                    <option value="auto">Auto Switch (hover to interact)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Wind Strength:</label>
+                <input type="range" id="windStrength" min="0" max="2" step="0.1" value="0.3">
+            </div>
+            
+            <div class="control-group">
+                <label>Gravity:</label>
+                <input type="range" id="gravity" min="0" max="2" step="0.1" value="0.5">
+            </div>
+            
+            <div class="control-group">
+                <label>Damping:</label>
+                <input type="range" id="damping" min="0.8" max="0.99" step="0.01" value="0.95">
+            </div>
+
+            <div class="control-group">
+                <label>Faces:</label>
+                <select id="faces"></select>
+            </div>
+            
+            <div class="control-group">
+                <button onclick="resetCloth()">Reset Cloth</button>
+                <button onclick="toggleAnimation()">Pause/Play</button>
+            </div>
+        </div>
+        
+        <div class="cloth" id="cloth"></div>
+    </div>
+    
+    <div class="info">
+        <strong>Interaction Modes:</strong><br>
+        • <strong>Auto Switch:</strong> Hover over content to interact with it, click elsewhere to drag cloth<br>
+        • <strong>Content Mode:</strong> Click and interact with the website content<br>
+        • <strong>Cloth Mode:</strong> Click and drag to manipulate the cloth physics
+    </div>
+
+    <script>
+        class ClothPoint {
+            constructor(x, y, pinned = false) {
+                this.x = x;
+                this.y = y;
+                this.oldX = x;
+                this.oldY = y;
+                this.pinned = pinned;
+                this.element = null;
+                this.isCorner = false;
+            }
+        }
+
+        class ClothSimulation {
+            constructor() {
+                this.width = 12;
+                this.height = 8;
+                this.spacing = 50;
+                this.points = [];
+                this.constraints = [];
+                this.isRunning = true;
+                this.mouseX = 0;
+                this.mouseY = 0;
+                this.selectedPoint = null;
+                this.showIframe = false;
+                this.iframeOverlays = [];
+                this.interactionMode = 'auto';
+                this.faces = 1;
+                
+                this.physics = {
+                    gravity: 0.5,
+                    damping: 0.95,
+                    windStrength: 0.3
+                };
+                
+                this.init();
+                this.createDOM();
+                this.bindEvents();
+                this.animate();
+            }
+            
+            init() {
+                this.points = [];
+                this.constraints = [];
+                this.selectedPoint = null;
+
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        const px = x * this.spacing;
+                        const py = y * this.spacing;
+                        const isCorner = (y === 0 || y === this.height - 1) && (x === 0 || x === this.width - 1);
+                        const point = new ClothPoint(px, py, isCorner);
+                        point.isCorner = isCorner;
+                        this.points.push(point);
+                    }
+                }
+                
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        if (x < this.width - 1) this.constraints.push({ p1: y * this.width + x, p2: y * this.width + x + 1, restLength: this.spacing });
+                        if (y < this.height - 1) this.constraints.push({ p1: y * this.width + x, p2: (y + 1) * this.width + x, restLength: this.spacing });
+                    }
+                }
+            }
+            
+            createDOM() {
+                const cloth = document.getElementById('cloth');
+                cloth.innerHTML = '';
+                this.iframeOverlays.forEach(o => o.remove());
+                this.iframeOverlays = [];
+
+                this.points.forEach(point => {
+                    const element = document.createElement('div');
+                    let className = 'cloth-point';
+                    if (point.pinned) className += ' pinned';
+                    if (point.isCorner) className += ' corner';
+                    element.className = className;
+                    cloth.appendChild(element);
+                    point.element = element;
+                });
+                
+                this.createIframeOverlays();
+            }
+            
+            createIframeOverlays() {
+                const cloth = document.getElementById('cloth');
+                this.iframeOverlays.forEach(overlay => overlay.remove());
+                this.iframeOverlays = [];
+
+                // Remove any existing shared iframe
+                if (this._sharedIframe && this._sharedIframe.parentNode) {
+                    this._sharedIframe.parentNode.removeChild(this._sharedIframe);
+                }
+                this._sharedIframe = null;
+
+                if (this.showIframe) {
+                    // Create a single shared iframe
+                    const sharedIframe = document.createElement('iframe');
+                    sharedIframe.sandbox = 'allow-scripts allow-same-origin allow-popups allow-forms';
+                    sharedIframe.style.position = 'absolute';
+                    sharedIframe.style.top = '0';
+                    sharedIframe.style.left = '0';
+                    sharedIframe.style.width = '480px';
+                    sharedIframe.style.height = '320px';
+                    sharedIframe.style.border = 'none';
+                    sharedIframe.style.background = 'white';
+                    sharedIframe.style.zIndex = '5';
+                    cloth.appendChild(sharedIframe);
+                    this._sharedIframe = sharedIframe;
+
+                    const faceCount = this.faces;
+                    const numCols = Math.ceil(Math.sqrt(faceCount));
+                    const numRows = Math.ceil(faceCount / numCols);
+
+                    for (let i = 0; i < faceCount; i++) {
+                        const overlay = document.createElement('div');
+                        overlay.className = 'iframe-overlay';
+                        overlay.style.background = 'transparent';
+                        overlay.style.overflow = 'hidden';
+                        overlay._faceIndex = i;
+                        cloth.appendChild(overlay);
+                        this.iframeOverlays.push(overlay);
+                    }
+                    this.loadIframeContent();
+                    this.updateIframeInteractivity();
+                }
+            }
+            
+            loadIframeContent() {
+                const select = document.getElementById('contentSelect');
+                const customUrlInput = document.getElementById('iframeUrl');
+                let url = select.value === 'custom' ? customUrlInput.value : select.value;
+                if (!url) url = 'https://example.com';
+
+                if (this._sharedIframe && this._sharedIframe.src !== url) {
+                    this._sharedIframe.src = url;
+                }
+
+                // Update all face iframes too
+                this.iframeOverlays.forEach(overlay => {
+                    const iframe = overlay.querySelector('iframe');
+                    if (iframe && iframe.src !== url) {
+                        iframe.src = url;
+                    }
+                });
+            }
+            
+            bindEvents() {
+                const container = document.querySelector('.container');
+                container.addEventListener('mousedown', (e) => {
+                    if (this.interactionMode !== 'iframe') {
+                        this.updateMousePosition(e);
+                        this.handlePointSelection();
+                    }
+                });
+                
+                document.addEventListener('mousemove', (e) => {
+                    this.updateMousePosition(e);
+                    if (this.selectedPoint) {
+                        this.selectedPoint.x = this.mouseX;
+                        this.selectedPoint.y = this.mouseY;
+                        this.selectedPoint.oldX = this.mouseX;
+                        this.selectedPoint.oldY = this.mouseY;
+                    }
+                });
+
+                document.getElementById('interactionMode').addEventListener('change', (e) => {
+                    this.interactionMode = e.target.value;
+                    this.updateIframeInteractivity();
+                });
+
+                document.getElementById('faces').addEventListener('change', (e) => {
+                    this.faces = parseInt(e.target.value, 10);
+                    this.createIframeOverlays();
+                });
+
+                document.getElementById('windStrength').addEventListener('input', (e) => this.physics.windStrength = parseFloat(e.target.value));
+                document.getElementById('gravity').addEventListener('input', (e) => this.physics.gravity = parseFloat(e.target.value));
+                document.getElementById('damping').addEventListener('input', (e) => this.physics.damping = parseFloat(e.target.value));
+            }
+            
+            handlePointSelection() {
+                let nearest = null;
+                let minDist = Infinity;
+
+                this.points.forEach(point => {
+                    const dist = Math.hypot(point.x - this.mouseX, point.y - this.mouseY);
+                    if (dist < (point.isCorner ? 30 : 20)) {
+                        minDist = dist;
+                        nearest = point;
+                    }
+                });
+
+                if (this.selectedPoint) {
+                    this.selectedPoint.element.classList.remove('selected');
+                }
+
+                if (this.selectedPoint && this.selectedPoint === nearest) {
+                    this.selectedPoint = null;
+                } else {
+                    this.selectedPoint = nearest;
+                    if (this.selectedPoint) {
+                        this.selectedPoint.element.classList.add('selected');
+                    }
+                }
+                this.updateIframeInteractivity();
+            }
+
+            updateIframeInteractivity() {
+                const isInteractive = !this.selectedPoint && this.interactionMode !== 'cloth';
+                this.iframeOverlays.forEach(overlay => {
+                    overlay.classList.toggle('interactive', isInteractive);
+                });
+            }
+            
+            updateMousePosition(e) {
+                const cloth = document.getElementById('cloth');
+                const rect = cloth.getBoundingClientRect();
+                this.mouseX = e.clientX - rect.left;
+                this.mouseY = e.clientY - rect.top;
+            }
+            
+            updatePhysics() {
+                this.points.forEach(point => {
+                    if (point.pinned || point === this.selectedPoint) return;
+                    
+                    const velX = (point.x - point.oldX) * this.physics.damping;
+                    const velY = (point.y - point.oldY) * this.physics.damping;
+                    
+                    point.oldX = point.x;
+                    point.oldY = point.y;
+                    
+                    point.x += velX + Math.sin(Date.now() * 0.001 + point.x * 0.01) * this.physics.windStrength;
+                    point.y += velY + this.physics.gravity;
+                });
+                
+                for (let i = 0; i < 5; i++) {
+                    this.constraints.forEach(constraint => {
+                        const p1 = this.points[constraint.p1];
+                        const p2 = this.points[constraint.p2];
+                        const dx = p2.x - p1.x;
+                        const dy = p2.y - p1.y;
+                        const distance = Math.hypot(dx, dy);
+                        if (distance > 0) {
+                            const difference = constraint.restLength - distance;
+                            const percent = difference / distance / 2;
+                            const offsetX = dx * percent;
+                            const offsetY = dy * percent;
+                            
+                            if (!p1.pinned && p1 !== this.selectedPoint) { p1.x -= offsetX; p1.y -= offsetY; }
+                            if (!p2.pinned && p2 !== this.selectedPoint) { p2.x += offsetX; p2.y += offsetY; }
+                        }
+                    });
+                }
+
+                const container = document.querySelector('.container');
+                const clothElement = document.getElementById('cloth');
+                if (!container || !clothElement) return;
+
+                const containerRect = container.getBoundingClientRect();
+                const clothRect = clothElement.getBoundingClientRect();
+
+                this.points.forEach(p => {
+                    if (p.pinned) return;
+                    
+                    const pointSize = p.isCorner ? 60 : 40;
+                    const velX = p.x - p.oldX;
+                    const velY = p.y - p.oldY;
+                    const bounce = 0.5;
+
+                    if (clothRect.left + p.x + pointSize / 2 > containerRect.right) {
+                        p.x = containerRect.right - clothRect.left - pointSize / 2;
+                        p.oldX = p.x + velX * bounce;
+                    }
+                    if (clothRect.left + p.x - pointSize / 2 < containerRect.left) {
+                        p.x = containerRect.left - clothRect.left + pointSize / 2;
+                        p.oldX = p.x + velX * bounce;
+                    }
+                    if (clothRect.top + p.y + pointSize / 2 > containerRect.bottom) {
+                        p.y = containerRect.bottom - clothRect.top - pointSize / 2;
+                        p.oldY = p.y + velY * bounce;
+                    }
+                    if (clothRect.top + p.y - pointSize / 2 < containerRect.top) {
+                        p.y = containerRect.top - clothRect.top + pointSize / 2;
+                        p.oldY = p.y + velY * bounce;
+                    }
+                });
+            }
+            
+            render() {
+                this.points.forEach(point => {
+                    const pointSize = point.isCorner ? 60 : 40;
+                    point.element.style.transform = `translate(${point.x - pointSize / 2}px, ${point.y - pointSize / 2}px)`;
+                });
+                
+                if (this.showIframe) {
+                    this.updateIframePositions();
+                }
+            }
+            
+            updateIframePositions() {
+                if (!this._sharedIframe) return;
+                const faceCount = this.faces;
+                const numCols = Math.ceil(Math.sqrt(faceCount));
+                const numRows = Math.ceil(faceCount / numCols);
+                const segCols = this.width - 1;
+                const segRows = this.height - 1;
+
+                let overlayIndex = 0;
+
+                for (let fy = 0; fy < numRows; fy++) {
+                    for (let fx = 0; fx < numCols; fx++) {
+                        if (overlayIndex >= this.iframeOverlays.length) continue;
+
+                        const startCol = Math.floor(fx * segCols / numCols);
+                        const endCol = Math.floor((fx + 1) * segCols / numCols);
+                        const startRow = Math.floor(fy * segRows / numRows);
+                        const endRow = Math.floor((fy + 1) * segRows / numRows);
+
+                        const p1 = this.points[startRow * this.width + startCol];
+                        const p2 = this.points[startRow * this.width + endCol];
+                        const p3 = this.points[endRow * this.width + endCol];
+                        const p4 = this.points[endRow * this.width + startCol];
+
+                        const overlay = this.iframeOverlays[overlayIndex++];
+                        if (!overlay) continue;
+
+                        const w = 480;
+                        const h = 320;
+
+                        // Create a cloned iframe for this face if it doesn't exist
+                        let faceIframe = overlay.querySelector('iframe');
+                        if (!faceIframe) {
+                            faceIframe = document.createElement('iframe');
+                            faceIframe.sandbox = 'allow-scripts allow-same-origin allow-popups allow-forms';
+                            faceIframe.style.width = '100%';
+                            faceIframe.style.height = '100%';
+                            faceIframe.style.border = 'none';
+                            faceIframe.style.background = 'white';
+                            faceIframe.style.position = 'absolute';
+                            faceIframe.style.top = '0';
+                            faceIframe.style.left = '0';
+                            faceIframe.src = this._sharedIframe.src;
+                            overlay.appendChild(faceIframe);
+                        }
+
+                        // Calculate transformation for this face
+                        const src = [{x:0,y:0}, {x:w,y:0}, {x:0,y:h}, {x:w,y:h}];
+                        const dst = [{x:p1.x,y:p1.y}, {x:p2.x,y:p2.y}, {x:p4.x,y:p4.y}, {x:p3.x,y:p3.y}];
+                        const t = this.getPerspectiveTransform(src, dst);
+                        
+                        if (t) {
+                            // Apply 3D transform to the overlay
+                            overlay.style.transform = `matrix3d(${t[0]},${t[1]},0,${t[2]},${t[3]},${t[4]},0,${t[5]},0,0,1,0,${t[6]},${t[7]},0,${t[8]})`;
+                            overlay.style.pointerEvents = this.interactionMode !== 'cloth' ? 'auto' : 'none';
+                        }
+                    }
+                }
+
+                // Hide the shared iframe since we're using individual ones now
+                this._sharedIframe.style.display = 'none';
+            }
+
+            getPerspectiveTransform(src, dst) {
+                const P = [
+                    [src[0].x, src[0].y, 1, 0, 0, 0, -src[0].x * dst[0].x, -src[0].y * dst[0].x],
+                    [0, 0, 0, src[0].x, src[0].y, 1, -src[0].x * dst[0].y, -src[0].y * dst[0].y],
+                    [src[1].x, src[1].y, 1, 0, 0, 0, -src[1].x * dst[1].x, -src[1].y * dst[1].x],
+                    [0, 0, 0, src[1].x, src[1].y, 1, -src[1].x * dst[1].y, -src[1].y * dst[1].y],
+                    [src[2].x, src[2].y, 1, 0, 0, 0, -src[2].x * dst[2].x, -src[2].y * dst[2].x],
+                    [0, 0, 0, src[2].x, src[2].y, 1, -src[2].x * dst[2].y, -src[2].y * dst[2].y],
+                    [src[3].x, src[3].y, 1, 0, 0, 0, -src[3].x * dst[3].x, -src[3].y * dst[3].x],
+                    [0, 0, 0, src[3].x, src[3].y, 1, -src[3].x * dst[3].y, -src[3].y * dst[3].y]
+                ];
+                const p = [dst[0].x, dst[0].y, dst[1].x, dst[1].y, dst[2].x, dst[2].y, dst[3].x, dst[3].y];
+                
+                const h = this.solveGaussian(P, p);
+                if (!h) return null;
+
+                return [h[0], h[3], h[6], h[1], h[4], h[7], h[2], h[5], 1];
+            }
+
+            solveGaussian(a, b) {
+                const n = 8;
+                for (let i = 0; i < n; i++) {
+                    let max = i;
+                    for (let j = i + 1; j < n; j++) {
+                        if (Math.abs(a[j][i]) > Math.abs(a[max][i])) max = j;
+                    }
+                    [a[i], a[max]] = [a[max], a[i]];
+                    [b[i], b[max]] = [b[max], b[i]];
+
+                    if (Math.abs(a[i][i]) <= 1e-10) return null;
+
+                    for (let j = i + 1; j < n; j++) {
+                        const f = a[j][i] / a[i][i];
+                        for (let k = i; k < n; k++) a[j][k] -= f * a[i][k];
+                        b[j] -= f * b[i];
+                    }
+                }
+                const x = new Array(n);
+                for (let i = n - 1; i >= 0; i--) {
+                    let sum = 0;
+                    for (let j = i + 1; j < n; j++) sum += a[i][j] * x[j];
+                    x[i] = (b[i] - sum) / a[i][i];
+                }
+                return x;
+            }
+            
+            animate() {
+                if (this.isRunning) {
+                    this.updatePhysics();
+                    this.render();
+                }
+                requestAnimationFrame(() => this.animate());
+            }
+            
+            reset() {
+                this.init();
+                this.createDOM();
+            }
+        }
+        
+        let simulation;
+        
+        function loadContent() {
+            if (simulation) {
+                simulation.loadIframeContent();
+            }
+        }
+        
+        function toggleIframe() {
+            if (simulation) {
+                simulation.showIframe = !simulation.showIframe;
+                simulation.createIframeOverlays();
+            }
+        }
+        
+        function toggleInteraction() {
+            const select = document.getElementById('interactionMode');
+            select.selectedIndex = (select.selectedIndex + 1) % select.options.length;
+            if (simulation) {
+                simulation.interactionMode = select.value;
+                simulation.updateIframeInteractivity();
+            }
+        }
+        
+        function resetCloth() {
+            if (simulation) simulation.reset();
+        }
+        
+        function toggleAnimation() {
+            if (simulation) simulation.isRunning = !simulation.isRunning;
+        }
+        
+window.addEventListener('load', () => {
+    // Dynamically populate the faces dropdown with powers of 2 up to 1024
+    const facesSelect = document.getElementById('faces');
+    facesSelect.innerHTML = '';
+    for (let i = 1; i <= 1024; i *= 2) {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = i;
+        facesSelect.appendChild(opt);
+    }
+
+    simulation = new ClothSimulation();
+    document.getElementById('contentSelect').addEventListener('change', () => {
+        const customGroup = document.getElementById('customUrlGroup');
+        customGroup.style.display = event.target.value === 'custom' ? 'block' : 'none';
+        loadContent();
+    });
+    document.getElementById('iframeUrl').addEventListener('change', loadContent);
+});
+    </script>
+</body>
+</html>

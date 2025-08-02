@@ -1,0 +1,362 @@
+/*
+  styles.css
+  Sleek & Modern Redesign v2 (Cyan/Charcoal)
+*/
+
+:root {
+    --primary-font: 'Poppins', sans-serif;
+    --title-font: 'Orbitron', sans-serif;
+    --primary-color: #00bcd4; /* Vibrant Cyan */
+    --primary-glow: rgba(0, 188, 212, 0.5);
+    --bg-color: #0a0f18; /* Deep Navy/Charcoal */
+    --surface-color: #191f2c; /* Slightly Lighter Surface */
+    --surface-bg: rgba(25, 31, 44, 0.6);
+    --text-color: #e0e6f0;
+    --text-color-dark: #8892b0;
+    --border-color: rgba(136, 146, 176, 0.2);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--primary-font);
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    overflow: hidden;
+    height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Canvas Background --- */
+#particle-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+}
+
+/* --- Main Page Layout --- */
+.main-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 20px;
+    position: relative;
+    z-index: 10;
+    animation: fadeIn 1s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.header h1 {
+    font-family: var(--title-font);
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    text-shadow: 0 0 15px var(--primary-glow);
+    color: #fff;
+}
+
+.settings-icon {
+    position: absolute;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-color-dark);
+    transition: color 0.3s, transform 0.3s;
+}
+
+.settings-icon:hover {
+    color: var(--primary-color);
+    transform: translateY(-50%) rotate(90deg);
+}
+
+/* --- Integrated Search Bar --- */
+.search-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 550px;
+    transition: box-shadow 0.3s;
+    border-radius: 50px;
+}
+
+.search-wrapper:focus-within {
+    box-shadow: 0 0 25px var(--primary-glow);
+}
+
+#urlInput {
+    width: 100%;
+    padding: 18px 60px 18px 25px;
+    border: 1px solid var(--border-color);
+    border-radius: 50px;
+    background-color: var(--surface-bg);
+    backdrop-filter: blur(5px);
+    color: var(--text-color);
+    font-family: var(--primary-font);
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+#searchButton {
+    position: absolute;
+    right: 7px;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 48px;
+    width: 48px;
+    border: none;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: #ffffff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+    outline: none;
+}
+
+#searchButton:hover {
+    background-color: #26c6da;
+    transform: translateY(-50%) scale(1.1);
+}
+
+/* --- Iframe & Proxy Toolbar --- */
+.iframe-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    z-index: 50;
+}
+
+.proxy-toolbar {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 900px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px;
+    background-color: var(--surface-bg);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 15px;
+    border: 1px solid var(--border-color);
+    z-index: 100;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    transition: all 0.4s ease;
+}
+
+.proxy-toolbar.block-style {
+    top: 0;
+    left: 0;
+    width: 100%;
+    max-width: none;
+    border-radius: 0;
+    transform: none;
+    border-left: none;
+    border-right: none;
+}
+
+.proxy-toolbar button {
+    background: transparent;
+    border: none;
+    color: var(--text-color-dark);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 10px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+.proxy-toolbar button:hover {
+    background-color: rgba(0, 188, 212, 0.1);
+    color: var(--primary-color);
+}
+
+#dragHandle { cursor: move; }
+body.is-dragging { user-select: none; }
+
+#proxyUrlInput {
+    flex-grow: 1;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 8px;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #ffffff;
+    font-family: var(--primary-font);
+    font-size: 0.9rem;
+    outline: none;
+    transition: box-shadow 0.3s ease;
+}
+
+#proxyUrlInput:focus {
+    box-shadow: 0 0 15px var(--primary-glow);
+}
+
+.iframeWindow {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background-color: #fff; /* Fallback bg for loading pages */
+    transition: margin-top 0.4s ease;
+}
+
+.proxy-toolbar.block-style ~ .iframeWindow {
+    margin-top: 56px; /* Adjust based on toolbar height */
+    height: calc(100% - 56px);
+}
+
+/* --- Footer --- */
+.footer {
+    position: absolute;
+    bottom: 20px;
+    font-size: 0.8rem;
+    color: var(--text-color-dark);
+    opacity: 0.7;
+}
+.footer p { display: flex; align-items: center; }
+.footer img { opacity: 0.5; height: 1.5em; margin: 0 5px;}
+
+/* --- Settings Modal --- */
+.settings-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(10, 15, 24, 0.6);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    animation: modalFadeIn 0.3s ease;
+}
+@keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.settings-modal-content {
+    background-color: var(--surface-color);
+    margin: 10vh auto;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    width: 90%;
+    max-width: 500px;
+    border-radius: 15px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    overflow: hidden;
+    animation: modalScaleUp 0.4s ease-out;
+}
+@keyframes modalScaleUp { 
+    from { transform: scale(0.9) translateY(-30px); opacity: 0; } 
+    to { transform: scale(1) translateY(0); opacity: 1; } 
+}
+
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 25px;
+    border-bottom: 1px solid var(--border-color);
+}
+.settings-header h2 {
+    margin: 0;
+    font-weight: 600;
+}
+.close-button {
+    color: var(--text-color-dark);
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.3s, transform 0.3s;
+}
+.close-button:hover {
+    color: white;
+    transform: rotate(90deg);
+}
+
+.settings-body { padding: 25px; }
+.settings-option { margin-bottom: 20px; }
+.settings-option label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 400;
+    color: var(--text-color-dark);
+}
+.settings-option select, .settings-option input {
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+    color: white;
+    font-family: var(--primary-font);
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.settings-option select:focus, .settings-option input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+
+#saveSettings {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    background-color: var(--primary-color);
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+    margin-top: 10px;
+}
+#saveSettings:hover {
+    background-color: #26c6da;
+    transform: translateY(-2px);
+}
+
+/* --- Custom Scrollbar --- */
+::-webkit-scrollbar {
+    width: 10px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+::-webkit-scrollbar-thumb {
+    background: #4a5468;
+    border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-color);
+}

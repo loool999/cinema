@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinema Proxy</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+
+    <script src="/uv/uv.bundle.js"></script>
+    <script src="/uv/uv.config.js"></script>
+    <script src="/libs/bare-mux.js"></script>
+    <script src="/libs/epoxy-transport.js"></script>
+    <!-- Epoxy Transport (if needed explicitly, otherwise /epoxy/ static serve handles it) -->
+    <script src="/epoxy/index.mjs" type="module"></script> <!-- Check if needed -->
+    <!-- Scramjet Controller -->
+    <script src="/scram/scramjet.controller.js"></script>
+</head>
+<body>
+    <!-- Canvas for the new background animation -->
+    <canvas id="particle-canvas"></canvas>
+
+    <div class="main-container">
+        <div class="header">
+            <h1>Cinema Proxy</h1>
+            <div class="settings-icon" id="settingsIcon">
+                <i class="fas fa-cog"></i>
+            </div>
+        </div>
+        <div class="search-container">
+            <div class="search-wrapper">
+                <input type="text" id="urlInput" placeholder="Search or enter a URL">
+                <button id="searchButton"><i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+        <div class="footer">
+            <p><img src="absolute-cinema.jpeg" alt="Absolute Cinema"> Absolute Cinema   <img src="absolute-cinema.jpeg" alt="Absolute Cinema"></p>
+        </div>
+    </div>
+    
+    <div class="iframe-container" id="iframeContainer">
+        <div class="proxy-toolbar" id="proxyToolbar">
+            <button id="dragHandle" title="Drag Toolbar"><i class="fas fa-arrows-alt"></i></button>
+            <button id="backButton" title="Back"><i class="fas fa-arrow-left"></i></button>
+            <button id="forwardButton" title="Forward"><i class="fas fa-arrow-right"></i></button>
+            <button id="refreshButton" title="Refresh"><i class="fas fa-redo"></i></button>
+            <input type="text" id="proxyUrlInput" readonly>
+            <button id="proxySettingsButton" title="Settings"><i class="fas fa-cog"></i></button>
+            <button id="styleToggleButton" title="Toggle Toolbar Style"><i class="fas fa-th-large"></i></button>
+        </div>
+        <iframe id="iframe" class="iframeWindow"></iframe>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="settings-modal" id="settingsModal">
+        <div class="settings-modal-content">
+            <div class="settings-header">
+                <h2>Settings</h2>
+                <span class="close-button" id="closeButton">×</span>
+            </div>
+            <div class="settings-body">
+                <div class="settings-option">
+                    <label for="proxySwitcher">Proxy:</label>
+                    <select id="proxySwitcher">
+                        <option value="scramjet">Scramjet</option>
+                        <option value="uv">UV</option>
+                    </select>
+                </div>
+                <div class="settings-option">
+                    <label for="serverSwitcher">Server:</label>
+                    <select id="serverSwitcher">
+                        <option value="wisp">Wisp</option>
+                        <option value="bare">BareMux</option>
+                    </select>
+                </div>
+                <div class="settings-option" id="wispUrlContainer">
+                    <label for="wispUrl">Wisp URL:</label>
+                    <input type="text" id="wispUrl" placeholder="wss://your-wisp-server.com">
+                </div>
+                <div class="settings-option" id="bareUrlContainer">
+                    <label for="bareUrl">Bare URL:</label>
+                    <input type="text" id="bareUrl" placeholder="https://your-bare-server.com">
+                </div>
+                <div class="settings-option">
+                    <label for="searchEngineSwitcher">Search Engine:</label>
+                    <select id="searchEngineSwitcher">
+                        <option value="https://www.google.com/search?q=">Google</option>
+                        <option value="https://duckduckgo.com/?q=">DuckDuckGo</option>
+                        <option value="https://www.bing.com/search?q=">Bing</option>
+                    </select>
+                </div>
+                <button id="saveSettings">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application Script -->
+    <script src="scripts.js"></script>
+    <!-- New Canvas Animation Script -->
+    <script src="animation.js"></script>
+</body>
+</html>
