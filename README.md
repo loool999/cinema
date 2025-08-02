@@ -13,7 +13,7 @@ uh, proxy for a contest. made in like 15 hours.
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (LTS version recommended)
+- [Node.js](https://nodejs.org/)
 - A package manager like `npm` or `pnpm`
 
 ### Installation
