@@ -1,6 +1,6 @@
-# Wisp Proxy with Scramjet
+# Cinema proxy
 
-This project is a high-performance web proxy utilizing the Wisp protocol, powered by a Scramjet-enhanced data stream engine. It leverages the Bare server for handling HTTP requests and integrates with the Ultraviolet proxy framework for a seamless and robust browsing experience.
+uh, proxy for a contest. made in like 15 hours.
 
 ## Features
 
@@ -10,8 +10,6 @@ This project is a high-performance web proxy utilizing the Wisp protocol, powere
 - **Scramjet**
 
 ## Getting Started
-
-Follow these instructions to get a local copy up and running.
 
 ### Prerequisites
 
