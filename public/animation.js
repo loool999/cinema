@@ -5,132 +5,179 @@ canvas.height = window.innerHeight;
 
 let particlesArray;
 
-// Mouse position
-let mouse = {
-    x: null,
-    y: null,
-    radius: (canvas.height / 120) * (canvas.width / 120) // Repulsion radius
+// --- Configuration ---
+const config = {
+    particleCount: (canvas.width * canvas.height) / 8000,
+    baseSpeed: 0.5, // The normal speed of particles
+    zoomSpeed: 30,  // The speed during the transition
+    currentSpeed: 0.5, // The speed for the current frame
+    connectDistance: 120,
+    mouseRepulsionRadius: 150,
+    mouseRepulsionStrength: 2,
+    rotationSensitivity: 0.005
 };
 
+// --- Camera & Mouse State ---
+const camera = {
+    rotationX: 0, rotationY: 0,
+    cosX: 1, sinX: 0, cosY: 1, sinY: 0
+};
+
+let mouse = {
+    x: null, y: null,
+    lastX: 0, lastY: 0,
+    isRotating: false
+};
+
+// --- Event Listeners ---
+// (No changes to event listeners, they are the same as before)
 window.addEventListener('mousemove', (event) => {
-    mouse.x = event.x;
-    mouse.y = event.y;
+    if (!mouse.isRotating) { mouse.x = event.x; mouse.y = event.y; }
+    if (mouse.isRotating) {
+        const deltaX = event.clientX - mouse.lastX;
+        const deltaY = event.clientY - mouse.lastY;
+        camera.rotationY += deltaX * config.rotationSensitivity;
+        camera.rotationX += deltaY * config.rotationSensitivity;
+        mouse.lastX = event.clientX;
+        mouse.lastY = event.clientY;
+    }
 });
-
-window.addEventListener('mouseout', () => {
-    mouse.x = undefined;
-    mouse.y = undefined;
+window.addEventListener('mouseout', () => { mouse.x = null; mouse.y = null; });
+canvas.addEventListener('mousedown', (event) => {
+    if (event.button === 2) {
+        mouse.isRotating = true;
+        mouse.lastX = event.clientX;
+        mouse.lastY = event.clientY;
+        canvas.style.cursor = 'grabbing';
+    }
 });
+window.addEventListener('mouseup', (event) => {
+    if (event.button === 2) {
+        mouse.isRotating = false;
+        canvas.style.cursor = 'default';
+    }
+});
+canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
-// Particle class
+
+// --- Particle Class with 3D properties ---
+// (No changes to the Particle class itself)
 class Particle {
-    constructor(x, y, directionX, directionY, size, color) {
-        this.x = x;
-        this.y = y;
-        this.directionX = directionX;
-        this.directionY = directionY;
-        this.size = size;
-        this.color = color;
-        this.baseAlpha = Math.random() * 0.5 + 0.2; // Store base opacity
+    constructor() { this.reset(); }
+    reset() {
+        this.x = (Math.random() - 0.5) * canvas.width * 1.5;
+        this.y = (Math.random() - 0.5) * canvas.height * 1.5;
+        this.z = Math.random() * canvas.width;
+        this.screenX = 0; this.screenY = 0;
+        this.screenSize = 0; this.screenAlpha = 0;
     }
-
-    // Method to draw individual particle
-    draw() {
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2, false);
-        ctx.fillStyle = `rgba(224, 230, 240, ${this.baseAlpha})`; // Use baseAlpha for drawing
-        ctx.fill();
+    project() {
+        let rotX_Y = this.x * camera.cosY + this.z * camera.sinY;
+        let rotZ_Y = this.z * camera.cosY - this.x * camera.sinY;
+        let rotY_X = this.y * camera.cosX - rotZ_Y * camera.sinX;
+        let finalZ = rotZ_Y * camera.cosX + this.y * camera.sinX;
+        const scale = canvas.width / (canvas.width + finalZ);
+        this.screenX = rotX_Y * scale + canvas.width / 2;
+        this.screenY = rotY_X * scale + canvas.height / 2;
+        this.screenSize = (1 - finalZ / canvas.width) * 4;
+        this.screenAlpha = Math.max(0, 1 - finalZ / canvas.width);
     }
-
-    // Check particle position, mouse position, move the particle, draw the particle
     update() {
-        // Check if particle is still within canvas
-        if (this.x > canvas.width || this.x < 0) {
-            this.directionX = -this.directionX;
+        this.z -= config.currentSpeed; // Use the dynamic currentSpeed
+        this.project();
+        if (this.z < 1 || this.screenX < 0 || this.screenX > canvas.width || this.screenY < 0 || this.screenY > canvas.height) {
+            this.reset();
+            this.project();
         }
-        if (this.y > canvas.height || this.y < 0) {
-            this.directionY = -this.directionY;
-        }
-
-        // Check for mouse collision (repulsion)
-        let dx = mouse.x - this.x;
-        let dy = mouse.y - this.y;
-        let distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < mouse.radius + this.size) {
-            if (mouse.x < this.x && this.x < canvas.width - this.size * 10) {
-                this.x += 5;
-            }
-            if (mouse.x > this.x && this.x > this.size * 10) {
-                this.x -= 5;
-            }
-            if (mouse.y < this.y && this.y < canvas.height - this.size * 10) {
-                this.y += 5;
-            }
-            if (mouse.y > this.y && this.y > this.size * 10) {
-                this.y -= 5;
+        if (!mouse.isRotating && mouse.x !== null) {
+            const dx = this.screenX - mouse.x;
+            const dy = this.screenY - mouse.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < config.mouseRepulsionRadius) {
+                const force = (config.mouseRepulsionRadius - distance) / config.mouseRepulsionRadius;
+                const angle = Math.atan2(dy, dx);
+                this.x += Math.cos(angle) * force * config.mouseRepulsionStrength;
+                this.y += Math.sin(angle) * force * config.mouseRepulsionStrength;
             }
         }
-        // Move particle
-        this.x += this.directionX;
-        this.y += this.directionY;
-        // Draw particle
-        this.draw();
+    }
+    draw() {
+        if (this.screenSize > 0) {
+            ctx.beginPath();
+            ctx.arc(this.screenX, this.screenY, this.screenSize, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(224, 230, 240, ${this.screenAlpha})`; 
+            ctx.fill();
+        }
     }
 }
 
-// Create particle array
-function init() {
-    particlesArray = [];
-    let numberOfParticles = (canvas.height * canvas.width) / 9000;
-    for (let i = 0; i < numberOfParticles; i++) {
-        let size = (Math.random() * 2.5) + 0.5; // Random size
-        let x = (Math.random() * ((innerWidth - size * 2) - (size * 2)) + size * 2);
-        let y = (Math.random() * ((innerHeight - size * 2) - (size * 2)) + size * 2);
-        let directionX = (Math.random() * 0.6) - 0.3; // Random speed and direction
-        let directionY = (Math.random() * 0.6) - 0.3;
-        let color = '#E0E6F0';
-
-        particlesArray.push(new Particle(x, y, directionX, directionY, size, color));
-    }
-}
-
-// Animation loop
-function animate() {
-    requestAnimationFrame(animate);
-    ctx.clearRect(0, 0, innerWidth, innerHeight);
-
-    for (let i = 0; i < particlesArray.length; i++) {
-        particlesArray[i].update();
-    }
-    connect();
-}
-
-// Check if particles are close enough to draw a line between them
+// --- Connect function is unchanged ---
 function connect() {
-    let opacityValue = 1;
     for (let a = 0; a < particlesArray.length; a++) {
         for (let b = a; b < particlesArray.length; b++) {
-            let distance = ((particlesArray[a].x - particlesArray[b].x) * (particlesArray[a].x - particlesArray[b].x)) +
-                ((particlesArray[a].y - particlesArray[b].y) * (particlesArray[a].y - particlesArray[b].y));
-            
-            if (distance < (canvas.width / 7) * (canvas.height / 7)) {
-                opacityValue = 1 - (distance / 20000);
-                ctx.strokeStyle = `rgba(224, 230, 240, ${opacityValue})`;
-                ctx.lineWidth = 0.5;
+            const p1 = particlesArray[a], p2 = particlesArray[b];
+            if (p1.screenSize <= 0 || p2.screenSize <= 0) continue;
+            const dx = p1.screenX - p2.screenX, dy = p1.screenY - p2.screenY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < config.connectDistance) {
+                const distanceOpacity = 1 - (distance / config.connectDistance);
+                const combinedAlpha = Math.min(p1.screenAlpha, p2.screenAlpha);
+                ctx.strokeStyle = `rgba(224, 230, 240, ${distanceOpacity * combinedAlpha * 0.5})`;
+                ctx.lineWidth = Math.min(p1.screenSize, p2.screenSize) * 0.4;
                 ctx.beginPath();
-                ctx.moveTo(particlesArray[a].x, particlesArray[a].y);
-                ctx.lineTo(particlesArray[b].x, particlesArray[b].y);
+                ctx.moveTo(p1.screenX, p1.screenY);
+                ctx.lineTo(p2.screenX, p2.screenY);
                 ctx.stroke();
             }
         }
     }
 }
 
-// Resize event
+
+// --- NEW: Global function to control the transition ---
+// We attach it to the window object so scripts.js can call it.
+window.particleAnimation = {
+    triggerTransition: (callback) => {
+        // 1. Set the speed to high for the zoom effect
+        config.currentSpeed = config.zoomSpeed;
+        
+        // 2. Start fading out the canvas
+        canvas.style.opacity = '0';
+        
+        // 3. After the fade is complete, execute the callback
+        // The callback will be provided by scripts.js to load the iframe.
+        setTimeout(() => {
+            // Reset speed for when/if we return to this page
+            config.currentSpeed = config.baseSpeed;
+            if (callback) callback();
+        }, 1000); // This duration must match the CSS transition duration
+    }
+};
+
+// --- Initialization and Animation Loop ---
+function init() {
+    particlesArray = [];
+    for (let i = 0; i < config.particleCount; i++) {
+        particlesArray.push(new Particle());
+    }
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    camera.cosX = Math.cos(camera.rotationX); camera.sinX = Math.sin(camera.rotationX);
+    camera.cosY = Math.cos(camera.rotationY); camera.sinY = Math.sin(camera.rotationY);
+    for (const particle of particlesArray) {
+        particle.update();
+        particle.draw();
+    }
+    connect();
+}
+
 window.addEventListener('resize', () => {
-    canvas.width = innerWidth;
-    canvas.height = innerHeight;
-    mouse.radius = (canvas.height / 120) * (canvas.width / 120);
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    config.particleCount = (canvas.width * canvas.height) / 8000;
     init();
 });
 

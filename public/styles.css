@@ -206,6 +206,40 @@ body {
 #dragHandle { cursor: move; }
 body.is-dragging { user-select: none; }
 
+#particle-canvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    transition: opacity 1s ease-in-out;
+}
+
+
+.main-container {
+    transition: opacity 1s ease-in-out;
+}
+
+.iframe-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 50;
+
+    display: block; 
+    opacity: 0;
+    pointer-events: none; 
+    transition: opacity 0.8s ease-in-out 0.5s;
+}
+
+
+.iframe-container.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
 #proxyUrlInput {
     flex-grow: 1;
     padding: 10px 15px;

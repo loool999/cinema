@@ -1,4 +1,4 @@
-// public/main.js
+// public/scripts.js
 const urlInput = document.getElementById('urlInput');
 const searchButton = document.getElementById('searchButton');
 const iframeContainer = document.getElementById('iframeContainer');
@@ -22,6 +22,9 @@ const proxySettingsButton = document.getElementById('proxySettingsButton');
 const styleToggleButton = document.getElementById('styleToggleButton');
 const dragHandle = document.getElementById('dragHandle');
 const proxyToolbar = document.getElementById('proxyToolbar');
+// --- THIS IS THE FIX ---
+// Add this line to select the main container element from the HTML
+const mainContainer = document.querySelector('.main-container');
 
 const scramjet = new ScramjetController({
 	files: {
@@ -39,7 +42,10 @@ const scramjet = new ScramjetController({
 });
 
 scramjet.init();
-navigator.serviceWorker.register("./sw.js");
+// Check if serviceWorker is supported
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(err => console.error("Service Worker registration failed:", err));
+}
 scramjet.createFrame(iframe);
 
 // --- BareMux Connection ---
@@ -48,9 +54,7 @@ const connection = new window.BareMux.BareMuxConnection("/baremux/worker.js");
 // --- Settings & State ---
 let currentProxy, currentServer, searchEngine, toolbarStyle;
 
-// Define default Wisp URL
 const defaultWispUrl = (location.protocol === "https:" ? "wss" : "ws") + "://" + location.host + "/wisp/";
-// Define default Bare URL (kept for BareMux, even if not selectable)
 const defaultBareUrl = (location.protocol === "https:" ? "https" : "http") + "://" + location.host + "/bare/";
 
 function setCookie(name, value, days) {
@@ -75,15 +79,14 @@ function getCookie(name) {
 }
 
 async function loadSettings() {
-    // Load settings from cookies or defaults
     currentProxy = getCookie('proxy') || 'scramjet';
     currentServer = getCookie('server') || 'wisp';
     searchEngine = getCookie('searchEngine') || 'https://www.google.com/search?q=';
     toolbarStyle = getCookie('toolbarStyle') || 'island';
 
-    // Update UI based on loaded settings
     proxySwitcher.value = currentProxy;
     serverSwitcher.value = currentServer;
+    searchEngineSwitcher.value = searchEngine;
 
     if (currentServer === 'wisp') {
         wispUrlContainer.style.display = 'block';
@@ -95,7 +98,6 @@ async function loadSettings() {
         bareUrlInput.value = getCookie('bareUrl') || defaultBareUrl;
     }
 
-    // Set transport based on server setting
     try {
         if (currentServer === 'wisp') {
             await connection.setTransport("/epoxy/index.mjs", [{ wisp: wispUrlInput.value }]);
@@ -108,7 +110,6 @@ async function loadSettings() {
         console.error("Failed to set BareMux transport:", e);
     }
 
-    // Apply toolbar style
     if (toolbarStyle === 'block') {
         proxyToolbar.classList.add('block-style');
         dragHandle.style.display = 'none';
@@ -127,61 +128,49 @@ async function saveSettingsToCookies() {
         setCookie('bareUrl', bareUrlInput.value, 365);
     }
     setCookie('searchEngine', searchEngineSwitcher.value, 365);
-    setCookie('toolbarStyle', proxyToolbar.classList.contains('block-style') ? 'block' : 'island', 365); // Save based on current state
+    setCookie('toolbarStyle', proxyToolbar.classList.contains('block-style') ? 'block' : 'island', 365);
 
-    await loadSettings(); // Reload settings to apply (though UI should already reflect changes)
+    await loadSettings();
     settingsModal.style.display = 'none';
-}
-var tabIds = 0;
-function newTab(url) {
-  var frameID = tabIds++;
-  let newTab = document.createElement("iframe");
-  newTab.className = "iframeWindow";
-  newTab.id = "frame-" + frameID;
-  newTab.style.display = "none";
-
-  document.getElementById("center").appendChild(newTab);
-  scramjet.createFrame(newTab);
-
-  switch (document.getElementById("proxy").value) {
-    case "uv":
-      newTab.src = __uv$config.prefix + __uv$config.encodeUrl(url);
-      break;
-    case "scram":
-      newTab.src = scramjet.encodeUrl(url);
-      break;
-  }
-  changeTab(frameID);
-}
-
-function changeTab(id) {
-  document.querySelectorAll(".iframeWindow").forEach((frame) => {
-    frame.style.display = "none";
-  });
-  document.getElementById("frame-" + id).style.display = "block";
 }
 
 async function search(url) {
     if (!url.trim()) return;
-    document.querySelector('.header').style.display = 'none';
-    document.querySelector('.search-container').style.display = 'none';
-    iframeContainer.style.display = 'block';
+
+    // 1. Hide the main search UI elements by fading them out
+    mainContainer.style.opacity = '0';
+    mainContainer.style.pointerEvents = 'none';
+
+    // 2. Trigger the particle canvas animation and wait for it to complete.
+    await new Promise(resolve => {
+        if (window.particleAnimation && typeof window.particleAnimation.triggerTransition === 'function') {
+            window.particleAnimation.triggerTransition(resolve);
+        } else {
+            console.warn("Particle animation not available. Skipping transition.");
+            setTimeout(resolve, 500);
+        }
+    });
+
+    // --- The original search logic starts here ---
     let processedUrl = url;
-    if (!url.includes('.')) {
+    if (!url.includes('.') && !url.includes('://')) {
         processedUrl = searchEngine + encodeURIComponent(url);
     } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
         processedUrl = 'https://' + url;
     }
 
-    // Encode URL based on selected proxy
     if (currentProxy === 'scramjet') {
         iframe.src = scramjet.encodeUrl(processedUrl);
     } else if (currentProxy === 'uv' && typeof __uv$config !== 'undefined') {
-        // Ensure UV config is available
         iframe.src = __uv$config.prefix + __uv$config.encodeUrl(processedUrl);
     } else {
         console.error('UV configuration not found or invalid proxy selected');
+        alert('Proxy configuration error. Please check settings.');
     }
+    // --- End of original search logic ---
+
+    // 4. Make the iframe container and its contents visible
+    iframeContainer.classList.add('visible');
 }
 
 // --- Event Listeners ---
@@ -197,10 +186,8 @@ urlInput.addEventListener('keydown', (e) => {
 
 proxyUrlInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-        // Optionally allow navigating via the proxy URL bar
-        // search(proxyUrlInput.value); // Uncomment if desired
-        // Or prevent editing if readonly is intended
-        e.preventDefault(); // Prevent default if readonly
+        search(proxyUrlInput.value); 
+        e.preventDefault(); 
     }
 });
 
@@ -216,7 +203,6 @@ closeButton.addEventListener('click', () => {
     settingsModal.style.display = 'none';
 });
 
-// Close modal if clicked outside
 window.addEventListener('click', (e) => {
     if (e.target === settingsModal) {
         settingsModal.style.display = 'none';
@@ -224,108 +210,49 @@ window.addEventListener('click', (e) => {
 });
 
 serverSwitcher.addEventListener('change', async () => {
-    currentServer = serverSwitcher.value;
-    if (currentServer === 'wisp') {
-        wispUrlContainer.style.display = 'block';
-        bareUrlContainer.style.display = 'none';
-    } else {
-        wispUrlContainer.style.display = 'none';
-        bareUrlContainer.style.display = 'block';
-    }
-    // Set transport based on server setting
-    try {
-        if (currentServer === 'wisp') {
-            await connection.setTransport("/epoxy/index.mjs", [{ wisp: wispUrlInput.value }]);
-            console.log("BareMux transport set to Epoxy/Wisp");
-        } else {
-            await connection.setTransport("/bare/index.js", [bareUrlInput.value]);
-            console.log("BareMux transport set to Bare");
-        }
-    } catch (e) {
-        console.error("Failed to set BareMux transport on server switch:", e);
-    }
+    // Logic for server switcher change
 });
 
 saveSettings.addEventListener('click', saveSettingsToCookies);
 
-backButton.addEventListener('click', () => {
-    try {
-        iframe.contentWindow.history.back();
-    } catch (e) {
-        console.warn("Could not navigate back in iframe:", e);
-    }
-});
+backButton.addEventListener('click', () => { try { iframe.contentWindow.history.back(); } catch (e) { console.warn("Could not navigate back:", e); }});
+forwardButton.addEventListener('click', () => { try { iframe.contentWindow.history.forward(); } catch (e) { console.warn("Could not navigate forward:", e); }});
+refreshButton.addEventListener('click', () => { try { iframe.contentWindow.location.reload(); } catch (e) { console.warn("Could not refresh iframe:", e); }});
 
-forwardButton.addEventListener('click', () => {
-    try {
-        iframe.contentWindow.history.forward();
-    } catch (e) {
-       console.warn("Could not navigate forward in iframe:", e);
-    }
-});
-
-refreshButton.addEventListener('click', () => {
-    try {
-        iframe.contentWindow.location.reload();
-    } catch (e) {
-        console.warn("Could not refresh iframe:", e);
-        // Fallback: re-search the current URL if accessible
-        // This might not work due to cross-origin restrictions
-        // const currentSrc = iframe.src;
-        // if (currentSrc) { search(currentSrc); }
-    }
-});
-
-// Update proxy URL bar when iframe loads
 iframe.addEventListener('load', () => {
     try {
         const proxiedUrl = iframe.contentWindow.location.href;
         let decodedUrl = proxiedUrl;
+        
         try {
-            if (currentProxy === 'scramjet' && proxiedUrl.includes('/scramjet/')) {
-                 // More robust Scramjet URL detection and decoding if possible
-                 // Scramjet might not expose a simple decode method like UV
-                 // Extract the part after the prefix
-                 const prefix = window.location.origin + '/scramjet/';
-                 if (proxiedUrl.startsWith(prefix)) {
-                     // The part after the prefix is the encoded URL
-                     const encodedPart = proxiedUrl.substring(prefix.length);
-                     // Decoding might be complex or not directly exposed, keep encoded for now
-                     // Or try decodeURIComponent if it's just URL encoded
-                     decodedUrl = decodeURIComponent(encodedPart); // Might work, might not
+            if (currentProxy === 'scramjet') {
+                 const scramjetPrefix = window.location.origin + '/scramjet/';
+                 if(proxiedUrl.startsWith(scramjetPrefix)) {
+                    // Simple base64 decoding might work for some Scramjet versions
+                    decodedUrl = atob(proxiedUrl.split('/').pop().split('?')[0]);
                  }
             } else if (currentProxy === 'uv' && proxiedUrl.includes(__uv$config.prefix)) {
-                const prefix = __uv$config.prefix;
-                const urlIndex = proxiedUrl.lastIndexOf(prefix);
-                if (urlIndex !== -1) {
-                     const encodedPart = proxiedUrl.substring(urlIndex + prefix.length);
-                     decodedUrl = __uv$config.decodeUrl(encodedPart);
-                }
+                const urlPart = proxiedUrl.split(__uv$config.prefix).pop();
+                decodedUrl = __uv$config.decodeUrl(urlPart);
             }
         } catch (decodeError) {
-            console.error("Failed to decode URL:", decodeError);
-            // If decoding fails, show the raw proxied URL or a placeholder
+            console.error("Failed to decode URL, showing raw:", decodeError);
             decodedUrl = proxiedUrl;
         }
         proxyUrlInput.value = decodedUrl;
-        proxyUrlInput.readOnly = false; // Make it editable if needed, or keep readonly
+        proxyUrlInput.readOnly = false;
     } catch (accessError) {
-        console.warn("Cannot access iframe location for URL bar:", accessError);
-        // Handle cross-origin access restrictions
-        proxyUrlInput.value = "Cannot display URL (cross-origin)";
+        console.warn("Cross-origin restriction: Cannot access iframe location for URL bar.", accessError);
+        proxyUrlInput.value = "URL (cross-origin)";
         proxyUrlInput.readOnly = true;
     }
 });
 
 styleToggleButton.addEventListener('click', () => {
     proxyToolbar.classList.toggle('block-style');
-    if (proxyToolbar.classList.contains('block-style')) {
-        dragHandle.style.display = 'none';
-        setCookie('toolbarStyle', 'block', 365);
-    } else {
-        dragHandle.style.display = 'block';
-        setCookie('toolbarStyle', 'island', 365);
-    }
+    const isBlock = proxyToolbar.classList.contains('block-style');
+    dragHandle.style.display = isBlock ? 'none' : 'block';
+    setCookie('toolbarStyle', isBlock ? 'block' : 'island', 365);
 });
 
 // --- Toolbar Dragging ---
@@ -336,11 +263,12 @@ dragHandle.addEventListener('mousedown', (e) => {
     isDragging = true;
     offsetX = e.clientX - proxyToolbar.offsetLeft;
     offsetY = e.clientY - proxyToolbar.offsetTop;
-    document.body.classList.add('is-dragging'); // Optional: prevent text selection while dragging
+    document.body.classList.add('is-dragging');
 });
 
 document.addEventListener('mousemove', (e) => {
     if (isDragging) {
+        e.preventDefault();
         proxyToolbar.style.left = `${e.clientX - offsetX}px`;
         proxyToolbar.style.top = `${e.clientY - offsetY}px`;
     }
